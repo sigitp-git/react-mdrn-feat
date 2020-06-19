@@ -1,0 +1,247 @@
+import React, { useState, useEffect, useReducer } from 'react'
+//import logo from './logo.svg';
+import './App.css'
+
+const App = (props) => {
+  const [count, setCount] = useState(props.init)
+  const [text, setText] = useState('')
+
+  // useEffect() is basically ComponentDidMount and ComponentDidUpdate lifecyle methods
+  // it runs on 1st load, component state change, component props change
+  // with useEffect() we can sync state and props, for example set title props of the page to be the same as count state
+  // state is local to this App Component, just like JS local variable inside a function() {let var; console.log(var)}
+  // props is passed around between Component, just like passed variable in JS function(var) {console.log(var)}
+  // here our App Component state is count, we pass this count into props for our DOM as document.title props
+  // useEffect can relate state to props real-time (onMount, onUpdate (state, props))
+
+  useEffect(() => {
+    document.title = count
+  }, [count])
+
+  return (
+    <div>
+      <p>
+        The current {text} is {count}
+      </p>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+      <button onClick={() => setCount(count - 1)}>-1</button>
+      <button onClick={() => setCount(props.init)}>reset</button>
+      {/* controlled input, value and change tied to state changes*/}
+      <input
+        type='text'
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+    </div>
+  )
+}
+
+App.defaultProps = {
+  init: 0,
+  text: 'count',
+}
+
+// hooks are just functions we can use
+// useState can use default value number, boolean, string, array, object, array of objects
+// in RCC state must be an object, in RFC no need
+// decouple state with multiple useState
+// setxxx in useState replaces state completely
+
+// @@@@@@@@@@@@@ UseState, UseEffect, and LocalStorage (or Amplify DataStore) @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+// useEffect can be used to sync state with local Storage or @@@ Amplify DataStore
+// @@@@ GOAL: Utilize UseEffect() to Sync Notes State with LocalStorage (or Amplify DataStore)
+/// Step 1. Read Notes array of objects from LocalStorage (or Amplify DataStore)
+/// Step 2. If No Notes stored, default to empty array
+/// Step 3. Utilize UseEffect() to update LocalStorage (or Amplify DataStore) when Notes state changes
+
+// useReducer similar to Redux Reducer
+// first define the reducer function, then call the useReducer
+// useReducer is useful so we can connect component to a state, props, or functions without having to manually pass as props
+// for example <Note /> component below that needs i={i}, rmNote={rmNote}
+// first we defined the reducer function outside the component App, then use it inside the component App
+
+
+// state is storing notes state returned by each switch case
+// action is object passed by the dispatch calls inside the components, whic also passed new state to be added into state
+const notesReducer = (state, action) => {
+  switch (action.type) {
+    case 'FETCH_NOTES':
+      return action.notes
+    case 'ADD_NOTE':
+      return [...state, action.note]
+    case 'RM_NOTE':
+      return [...action.notes]
+    default:
+      return state
+  }
+}
+
+const NoteApp = () => {
+  // notes state is an array, array of objects. the objects consists of title and body props, also tracked as states
+  // notes state is the one sync with localStorage (or AmplifyDatastore), title and body are not, tile and body feeds notes
+  // add second argument in useEffect(function, [listenonlythisstate]) to save cost of syncing to local or ext DB
+
+  // const [notes, setNotes] = useState([]) //commmented because we are using useReducer(), instead of setNotes, we have dispatchNotes
+  // useReducer is needed if we need to maintain data, filter in a state, more complex state but avoiding redux
+  const [notes, dispatchNotes] = useReducer(notesReducer, [])
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [status, setStatus] = useState('')
+
+  // useEffect() can be called multiple times for each specific features and state dependencies
+  // to only do useEffect() once and only once: pass empty array inside dependency/tracked states => ComponentDidMount
+  // useEffect will run in order it's coded
+  // this one time useEffect call is good for fetching Async data from ext DB (Amplify DataStore)
+  // similar as localStorage, instead of directly calling from localStorage/ext DB, utilize useEffect() once for retrieving data
+
+  // !!!!!!!!!!!!!useEffect1 => ExtDB---network--->setState(state)----> Render JSX from state, not from ExtDB
+  // !!!!!!!!!!!!!fetch data once from ext DB/localStorage to notes state during initial ComponentDidMount()
+  useEffect(() => {
+    console.log('load external data to state, one time')
+    const noteLocStore = JSON.parse(localStorage.getItem('notes'))
+    // define localStorage, to be synched with notes states using useEffect()
+    if (noteLocStore) {
+      // {type here is action.type in reducer, notes here is action.type in reducer}
+      dispatchNotes({ type: 'FETCH_NOTES', notes: noteLocStore })
+      // setNotes(noteLocStore)
+    }
+  }, [])
+
+  // !!!!!!!!!!!!!useEffect2 => state---network--->ExtDB----> Still Render JSX from state, not from ExtDB
+  // !!!!!!!!!!!!!save data to ext DB/localStorage, only during notes state change, but not on other states changes
+  // !!!!!!!!!!!!!this is basically ComponentDidUpdate(), only save to network--->ExtDB during state change, still render from state, not from ExtDB
+  useEffect(() => {
+    console.log('note state changes')
+    localStorage.setItem('notes', JSON.stringify(notes))
+  }, [notes])
+
+  // to save cost, only listen to [notes] changes and fire useEffect() => ComponentDidUpdate
+  // this second argument must be an array of listened states
+
+  // on form submit, call addNote, addNote will spread existing array of objects
+  // then add new note object with title prop: {value of current title state}
+  // then clear the controlled form by doing setTitle('')
+  const addNote = (e) => {
+    e.preventDefault()
+    if (title.length > 0 && body.length > 0) {
+      // setNotes([
+      //   ...notes,
+      //   {
+      //     title: title,
+      //     body: body,
+      //   },
+      // ])
+      dispatchNotes({ type: 'ADD_NOTE', note: { title: title, body: body } })
+      setTitle('')
+      setBody('')
+      setStatus(`${title} note saved`)
+    } else {
+      setStatus('title and body required')
+    }
+  }
+
+  const rmNote = (i) => {
+    setStatus(`note ${notes[i].title} deleted`)
+    notes.splice(i, 1)
+    // type here is action.type on reducer, notes here is action.notes on reducer, object destructuring
+    dispatchNotes({ type: 'RM_NOTE', notes: notes })
+    // setNotes([...notes])
+  }
+
+  // !!!!!!!!!!!!!when returning notes, all of the notes returned to JSX are from state, not from ext-DB/localStorage
+  // !!!!!!!!!!!!!this way, we save network cost
+  // !!!!!!!!!!!!!state does cleared up during reload, but
+  // !!!!!!!!!!!!!during reload we will get saved data into state (useEffect1) because data saved to notes during the useEffect2
+  return (
+    <div>
+      <h1>NOTEEEEE</h1>
+      <p>{status || 'welcome to note app'}</p>
+      {notes.map((note, i) => (
+        <Note key={i} i={i} note={note} rmNote={rmNote} />
+      ))}
+      <form onSubmit={(e) => addNote(e)}>
+        <div>
+          <input
+            placeholder='note title...'
+            type='text'
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+        <div>
+          <textarea
+            placeholder='note body...'
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          ></textarea>
+        </div>
+        <div>
+          <button>Add Note</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// !!!!!!!!!!!!!UseEffect() on child component, if we render 3 component notes
+// it is executed 3 times for each component, we can push empty array to make it only once
+// we can register a function to clean up the effect by returning another function inside the effect function
+// similar to ComponentDidUnmount
+const Note = (props) => {
+  useEffect(() => {
+    console.log('useEffect on child component runs')
+    return () => {
+      console.log('cleaning up effect')
+    }
+  }, [])
+  return (
+    <div>
+      <h3>{props.note.title}</h3>
+      <p>{props.note.body}</p>
+      <button onClick={() => props.rmNote(props.i)}>
+        rm {props.note.title}
+      </button>
+    </div>
+  )
+}
+
+// function App() {
+//   return (
+//     <div className="App">
+//       <header className="App-header">
+//         <img src={logo} className="App-logo" alt="logo" />
+//         <p>
+//           Edit <code>src/App.js</code> and save to reload.
+//         </p>
+//         <a
+//           className="App-link"
+//           href="https://reactjs.org"
+//           target="_blank"
+//           rel="noopener noreferrer"
+//         >
+//           Learn React
+//         </a>
+//       </header>
+//     </div>
+//   );
+// }
+
+export { NoteApp, App as default }
+
+
+
+// Manage Application State with React Hooks and Amplify DataStore
+
+// App for use case: Personal Expense Tracker App
+
+// React Hooks to use: useState(), useEffect(), and useReducer(). useEffect is for simpler state (title, body, date). useReducer is for more complex state which is combination of simpler state:  expenses, notes. 
+
+// With useReducer we decouple complex functions of handling state from the <Component /> itself and store it on separate file. The Component now just have to call the dispatch actions! and leave the logic on the reducer files. Dispatch actions triggers state changes then triggers saving to Amplify DataStore and triggers DOM re-render. 
+
+// This way component is easier to manage, and reducer is easier to reuse.
+
+// useState is using useReducer behind the scene... 
+
+// Amplify DataStore will be used to fetch initial state from the back-end (AWS Cloud) using one-time run useEffect(f, []).
+
+// Amplify DataStore will also be used to store only the dependency-state changes into the back-end (AWS Cloud) using useEffect(f, [dependency-state]). 
