@@ -5,7 +5,7 @@ import Context from '../context/context'
 const List = () => {
   // calling this, returns value{} from the Context.Provider component from App.js enclosing this List Component
   // value {} object contains 2 properties: notes and dispatchNotes, we only use notes here, destructure it
-  const { notes, dispatchNotes } = useContext(Context)
+  const { notes } = useContext(Context)
 
   return (
     <div>

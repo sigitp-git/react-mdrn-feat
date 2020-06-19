@@ -23,7 +23,7 @@ const Form = () => {
   }
 
   return (
-    <div>
+    <>
       <p>{status || 'welcome to note app'}</p>
       <form onSubmit={(e) => addNote(e)}>
         <div>
@@ -45,7 +45,7 @@ const Form = () => {
           <button>Add Note</button>
         </div>
       </form>
-    </div>
+    </>
   )
 }
 
